@@ -3,14 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebGPU WebComponent</title>
-    <link rel="stylesheet" href="style.css">
+    <title>WebGPU Image in Blog Article</title>
+    <script src="webgpu-image.js" type="module"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        .image-container {
+            width: 100%;
+            height: 100%;
+            margin: 20px 0;
+        }
+        .image-container.float-right {
+            float: right;
+            margin-left: 20px;
+            margin-bottom: 20px;
+            width: 200px;
+        }
+        .image-container.float-left {
+            float: left;
+            margin-right: 20px;
+            margin-bottom: 20px;
+            width: 150px;
+        }
+        webgpu-image {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
 </head>
 <body>
-    
-    <div class="main">
-        <canvas id="canvas"></canvas>
-    </div>
-    <script src="main.js"></script>
+    <article>
+        <h1>The Wonders of Nature</h1>
+        
+        <p>Nature never ceases to amaze us with its beauty and complexity. From the tiniest insects to the grandest landscapes, there's always something new to discover.</p>
+        
+        <div class="image-container">
+            <webgpu-image src="https://cdn.shopify.com/s/files/1/0817/9308/9592/files/crystal.png?v=1722451245" alt="A beautiful landscape"></webgpu-image>
+        </div>
+        
+        <p>The image above showcases the breathtaking beauty of a natural landscape. The interplay of light and shadow creates a mesmerizing effect, drawing the viewer into the scene.</p>
+        
+        <div class="image-container float-right">
+            <webgpu-image src="https://cdn.shopify.com/s/files/1/0817/9308/9592/files/pexels-photo-507410.jpg?v=1721170628" alt="A colorful butterfly"></webgpu-image>
+        </div>
+        
+        <p>Butterflies, with their delicate wings and vibrant colors, are some of nature's most beautiful creatures. They serve as important pollinators and are indicators of a healthy ecosystem.</p>
+        
+        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam auctor, nunc id aliquam tincidunt, nisl nunc tincidunt nunc, vitae aliquam nunc nunc vitae nunc. Sed euismod, nunc id aliquam tincidunt, nisl nunc tincidunt nunc, vitae aliquam nunc nunc vitae nunc.</p>
+        
+        <div class="image-container float-left">
+            <webgpu-image src="https://cdn.shopify.com/s/files/1/0817/9308/9592/files/studio.jpg?v=1720074765" alt="A majestic mountain"></webgpu-image>
+        </div>
+        
+        <p>Mountains, with their towering peaks and rugged terrain, have long captivated human imagination. They are not just geological formations but also home to diverse ecosystems and unique wildlife.</p>
+        
+        <p>Sed euismod, nunc id aliquam tincidunt, nisl nunc tincidunt nunc, vitae aliquam nunc nunc vitae nunc. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam auctor, nunc id aliquam tincidunt, nisl nunc tincidunt nunc, vitae aliquam nunc nunc vitae nunc.</p>
+    </article>
 </body>
 </html>
