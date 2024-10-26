@@ -54,11 +54,31 @@ async function initWebGPU() {
 }
 
 function resizeCanvas() {
-  const devicePixelRatio = window.devicePixelRatio || 1;
-  canvas.width = textureWidth * devicePixelRatio;
-  canvas.height = textureHeight * devicePixelRatio;
-  canvas.style.width = `${textureWidth}px`;
-  canvas.style.height = `${textureHeight}px`;
+  // Set the canvas size to match the texture size
+  canvas.width = textureWidth;
+  canvas.height = textureHeight;
+
+  // Calculate the scaling factor to fit the canvas vertically in the window
+  const scale = window.innerHeight / textureHeight;
+
+  // Calculate the scaled dimensions
+  const scaledWidth = textureWidth * scale;
+  const scaledHeight = textureHeight * scale;
+
+  // Apply the scaling
+  canvas.style.width = `${scaledWidth}px`;
+  canvas.style.height = `${scaledHeight}px`;
+
+  // Center the canvas horizontally
+  const horizontalMargin = (window.innerWidth - scaledWidth) / 2;
+  canvas.style.position = "absolute";
+  canvas.style.left = `${horizontalMargin}px`;
+  canvas.style.top = "0px";
+
+  // Log the new dimensions
+  console.log(`Canvas size: ${canvas.width}x${canvas.height}`);
+  console.log(`Displayed size: ${canvas.style.width}x${canvas.style.height}`);
+  console.log(`Left margin: ${canvas.style.left}`);
 }
 
 function createVertexBuffer(device) {
@@ -257,7 +277,7 @@ async function main() {
   // Initial render
   render();
 
-  // Set up resize handler if needed
+  // Set up resize handler
   window.addEventListener("resize", render);
 }
 
