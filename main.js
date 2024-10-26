@@ -4,9 +4,20 @@ const context = canvas.getContext("webgpu");
 
 let device, canvasFormat, pipeline, bindGroup, vertexBuffer;
 let textureWidth, textureHeight;
+let uniformBuffer; // Add this line
 
 // Create shader code
 const shaderCode = `
+    struct Uniforms {
+        tintColor: vec4f,
+        time: f32,
+        padding: vec3f, // Add padding to align to 16 bytes
+    }
+
+    @group(0) @binding(0) var texSampler: sampler;
+    @group(0) @binding(1) var tex: texture_2d<f32>;
+    @group(0) @binding(2) var<uniform> uniforms: Uniforms;
+
     struct VertexOutput {
         @builtin(position) position: vec4f,
         @location(0) texCoord: vec2f,
@@ -20,16 +31,20 @@ const shaderCode = `
         output.texCoord = texCoord;
         return output;
     }
-
-    @group(0) @binding(0) var texSampler: sampler;
-    @group(0) @binding(1) var tex: texture_2d<f32>;
-    @group(0) @binding(2) var<uniform> tintColor: vec4f;
-
+    const twopi = 6.2830;
     @fragment
+    
     fn fragmentMain(@location(0) texCoord: vec2f) -> @location(0) vec4f {
-        let texColor = textureSample(tex, texSampler, texCoord);
-        // Mix the texture color with the tint color
-        return texColor * tintColor;
+        let uv = texCoord;
+        let texColor = textureSample(tex, texSampler, uv);
+        // Animate the tint color based on time
+        let animatedTint = vec4f(
+            (sin(uniforms.time + uv.x * twopi) + 1.0) / 2.0,
+            (cos(uniforms.time + uv.y * twopi) + 1.0) / 2.0,
+            (sin(uniforms.time + uv.x * twopi + 3.14) + 1.0) / 2.0,
+            1.0
+        );
+        return texColor * animatedTint;
     }
 `;
 
@@ -54,31 +69,23 @@ async function initWebGPU() {
 }
 
 function resizeCanvas() {
-  // Set the canvas size to match the texture size
   canvas.width = textureWidth;
   canvas.height = textureHeight;
-
-  // Calculate the scaling factor to fit the canvas vertically in the window
   const scale = window.innerHeight / textureHeight;
-
-  // Calculate the scaled dimensions
   const scaledWidth = textureWidth * scale;
   const scaledHeight = textureHeight * scale;
-
-  // Apply the scaling
   canvas.style.width = `${scaledWidth}px`;
   canvas.style.height = `${scaledHeight}px`;
 
-  // Center the canvas horizontally
-  const horizontalMargin = (window.innerWidth - scaledWidth) / 2;
-  canvas.style.position = "absolute";
-  canvas.style.left = `${horizontalMargin}px`;
-  canvas.style.top = "0px";
+  //   const horizontalMargin = (window.innerWidth - scaledWidth) / 2;
+  //   canvas.style.position = "absolute";
+  //   canvas.style.left = `${horizontalMargin}px`;
+  //   canvas.style.top = "0px";
 
   // Log the new dimensions
-  console.log(`Canvas size: ${canvas.width}x${canvas.height}`);
-  console.log(`Displayed size: ${canvas.style.width}x${canvas.style.height}`);
-  console.log(`Left margin: ${canvas.style.left}`);
+  //   console.log(`Canvas size: ${canvas.width}x${canvas.height}`);
+  //   console.log(`Displayed size: ${canvas.style.width}x${canvas.style.height}`);
+  //   console.log(`Left margin: ${canvas.style.left}`);
 }
 
 function createVertexBuffer(device) {
@@ -193,6 +200,9 @@ function createRenderPipeline(
 function render() {
   resizeCanvas();
 
+  const currentTime = (performance.now() - startTime) / 1000; // Convert to seconds
+  updateUniformBuffer(device, uniformBuffer, currentTime);
+
   const commandEncoder = device.createCommandEncoder();
   const passEncoder = commandEncoder.beginRenderPass({
     colorAttachments: [
@@ -212,6 +222,8 @@ function render() {
   passEncoder.end();
 
   device.queue.submit([commandEncoder.finish()]);
+
+  requestAnimationFrame(render);
 }
 
 async function loadImage(src) {
@@ -247,15 +259,17 @@ async function main() {
   // Create texture and sampler
   const { texture, sampler } = createTextureAndSampler(device, img);
 
-  // Create uniform buffer for tint color (RGBA)
-  const uniformBuffer = device.createBuffer({
-    size: 16, // 4 floats * 4 bytes
+  // Create uniform buffer for tint color (RGBA) and time
+  const uniformBufferSize = 48; // Increase to 48 bytes (3 vec4f worth of space)
+  uniformBuffer = device.createBuffer({
+    size: uniformBufferSize,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
 
-  // Set tint color (red tint in this example)
-  const tintColor = new Float32Array([1.0, 0.0, 0.0, 1.0]); // Red tint
-  device.queue.writeBuffer(uniformBuffer, 0, tintColor);
+  // Initialize uniform buffer
+  const initialUniformData = new Float32Array(12);
+  initialUniformData.set([1.0, 1.0, 1.0, 1.0, 0.0]); // Initial white tint and 0 time
+  device.queue.writeBuffer(uniformBuffer, 0, initialUniformData);
 
   // Create bind group layout and bind group
   const { bindGroupLayout, bindGroup: bg } = createBindGroup(
@@ -274,11 +288,23 @@ async function main() {
     canvasFormat
   );
 
-  // Initial render
-  render();
-
-  // Set up resize handler
-  window.addEventListener("resize", render);
+  // Start the render loop
+  startTime = performance.now();
+  requestAnimationFrame(render);
 }
-
+// Set up resize handler
+window.addEventListener("resize", () => {
+  resizeCanvas();
+});
 main();
+
+function updateUniformBuffer(device, uniformBuffer, time) {
+  const uniformData = new Float32Array(12); // 12 floats total
+  uniformData[0] = 1.0; // R
+  uniformData[1] = 1.0; // G
+  uniformData[2] = 1.0; // B
+  uniformData[3] = 1.0; // A
+  uniformData[4] = time;
+  // uniformData[5] to [11] are implicitly 0 (padding)
+  device.queue.writeBuffer(uniformBuffer, 0, uniformData);
+}
