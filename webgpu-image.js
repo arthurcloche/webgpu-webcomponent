@@ -257,10 +257,17 @@ class WebGPUImage extends HTMLElement {
       return dot(color, vec3<f32>(0.299, 0.587, 0.114));
     }
 
+    fn offset(uv: vec2f) -> vec2f {
+      let amplitude = 0.025;
+      let frequency = 10.0;
+      let phase = uniforms.time * 10.0;
+      return (uv + vec2f(amplitude * sin(frequency * uv.x + phase) * 0., amplitude * sin(frequency * uv.x + phase)));
+    }
 
     @fragment
     fn fragmentMain(@location(0) uv: vec2f) -> @location(0) vec4f {
-      let texColor = textureSample(tex, texSampler, uv);
+      let offsetUV = offset(uv);
+      let texColor = textureSample(tex, texSampler, offsetUV);
       let luminance = 1.-luminance(texColor.rgb);
       let len = length(uv);
       let tint = vec4f(

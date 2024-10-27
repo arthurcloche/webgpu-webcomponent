@@ -8,9 +8,8 @@ h1 {
     color: #2c3e50;
 }
 .image-container {
-    width: 100%;
+    width: 80%;
     height: 100%;
-    margin: 20px 0;
 }
 .image-container.float-right {
     float: right;
@@ -24,11 +23,6 @@ h1 {
     margin-bottom: 20px;
     width: 150px;
 }
-webgpu-image {
-    max-width: 100%;
-    height: auto;
-}
-
 
 body{
     background-color: #111;
@@ -36,18 +30,16 @@ body{
     font-family: Arial, Helvetica, sans-serif;
     margin: 0;
     padding: 0;
-    overflow: hidden;
-    width: 100vw;
+    /* overflow: hidden; */
     height: 100vh;
 }
 
 .main{
-
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 100vh;
+    min-height: 100%;
 }
 
 h1{
@@ -56,15 +48,9 @@ h1{
 }
 
 webgpu-image {
-    width: 500px;
-    height: 500px;
     display: block;
-    margin: 20px auto;
 }
 
-
-    canvas {
-        width: 100vw;
-        height: 100vh;
-        display: block;
-    }
+canvas {
+    display: block;
+}
