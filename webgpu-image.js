@@ -2,11 +2,8 @@ class WebGPUImage extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    // Create the canvas in the constructor
     this.canvas = document.createElement("canvas");
     this.shadowRoot.appendChild(this.canvas);
-
-    // Set canvas to behave like an img
     this.style.display = "inline-block";
     this.canvas.style.display = "block";
     this.canvas.style.width = "100%";
@@ -37,14 +34,12 @@ class WebGPUImage extends HTMLElement {
     this.textureWidth = this.img.width;
     this.textureHeight = this.img.height;
 
-    // Set canvas size to match image size
     this.canvas.width = this.textureWidth;
     this.canvas.height = this.textureHeight;
 
-    // Initialize WebGPU
+    // WebGPU entry point
     await this.initializeWebGPU(imgSrc);
 
-    // Start rendering
     this.startTime = performance.now();
     this.render();
   }
@@ -60,23 +55,16 @@ class WebGPUImage extends HTMLElement {
   }
 
   async initializeWebGPU(imgSrc) {
-    // Check if WebGPU is supported
     if (!navigator.gpu) {
       console.error("WebGPU is not supported in this browser.");
       return;
     }
-
     this.context = this.canvas.getContext("webgpu");
     if (!this.context) {
       console.error("Failed to get WebGPU context");
       return;
     }
-
     this.device = await this.initDevice();
-    // Remove this line as we've already loaded the image in initWebGPU
-    // this.img = await this.loadImage(imgSrc);
-    // this.textureWidth and this.textureHeight are already set in initWebGPU
-
     this.canvasFormat = navigator.gpu.getPreferredCanvasFormat();
     this.context.configure({
       device: this.device,
@@ -121,6 +109,10 @@ class WebGPUImage extends HTMLElement {
     const sampler = this.device.createSampler({
       magFilter: "linear",
       minFilter: "linear",
+      mipmapFilter: "linear",
+      addressModeU: "clamp-to-edge",
+      addressModeV: "clamp-to-edge",
+      addressModeW: "clamp-to-edge",
     });
     return { texture, sampler };
   }
@@ -185,10 +177,8 @@ class WebGPUImage extends HTMLElement {
   }
 
   render() {
-    // Update uniform buffer
     this.updateUniformBuffer((performance.now() - this.startTime) / 1000);
 
-    // Encode and submit commands
     const commandEncoder = this.device.createCommandEncoder();
     const passEncoder = commandEncoder.beginRenderPass({
       colorAttachments: [
