@@ -84,7 +84,6 @@ class WebGPUImage extends HTMLElement {
       alphaMode: "premultiplied",
     });
 
-    this.vertexBuffer = this.createVertexBuffer();
     const { texture, sampler } = this.createTextureAndSampler();
     this.uniformBuffer = this.device.createBuffer({
       size: 48,
@@ -103,20 +102,6 @@ class WebGPUImage extends HTMLElement {
     const adapter = await navigator.gpu.requestAdapter();
     if (!adapter) throw new Error("No adapter found");
     return await adapter.requestDevice();
-  }
-
-  createVertexBuffer() {
-    const vertices = new Float32Array([
-      -1, -1, 0, 1, 1, -1, 1, 1, -1, 1, 0, 0, 1, 1, 1, 0,
-    ]);
-    const buffer = this.device.createBuffer({
-      size: vertices.byteLength,
-      usage: GPUBufferUsage.VERTEX,
-      mappedAtCreation: true,
-    });
-    new Float32Array(buffer.getMappedRange()).set(vertices);
-    buffer.unmap();
-    return buffer;
   }
 
   createTextureAndSampler() {
@@ -183,15 +168,6 @@ class WebGPUImage extends HTMLElement {
       vertex: {
         module: shaderModule,
         entryPoint: "vertexMain",
-        buffers: [
-          {
-            arrayStride: 16,
-            attributes: [
-              { shaderLocation: 0, offset: 0, format: "float32x2" },
-              { shaderLocation: 1, offset: 8, format: "float32x2" },
-            ],
-          },
-        ],
       },
       fragment: {
         module: shaderModule,
@@ -226,7 +202,6 @@ class WebGPUImage extends HTMLElement {
     });
     passEncoder.setPipeline(this.pipeline);
     passEncoder.setBindGroup(0, this.bindGroup);
-    passEncoder.setVertexBuffer(0, this.vertexBuffer);
     passEncoder.draw(4, 1, 0, 0);
     passEncoder.end();
     this.device.queue.submit([commandEncoder.finish()]);
@@ -235,42 +210,68 @@ class WebGPUImage extends HTMLElement {
   }
 
   shaderCode = `
-      struct Uniforms {
-        tintColor: vec4f,
-        time: f32,
-        padding: vec3f,
-      }
-  
-      @group(0) @binding(0) var texSampler: sampler;
-      @group(0) @binding(1) var tex: texture_2d<f32>;
-      @group(0) @binding(2) var<uniform> uniforms: Uniforms;
-  
-      struct VertexOutput {
-        @builtin(position) position: vec4f,
-        @location(0) texCoord: vec2f,
-      }
-  
-      @vertex
-      fn vertexMain(@location(0) position: vec2f,
-                    @location(1) texCoord: vec2f) -> VertexOutput {
-        var output: VertexOutput;
-        output.position = vec4f(position, 0.0, 1.0);
-        output.texCoord = texCoord;
-        return output;
-      }
-  
-      @fragment
-      fn fragmentMain(@location(0) texCoord: vec2f) -> @location(0) vec4f {
-        let texColor = textureSample(tex, texSampler, texCoord);
-        let animatedTint = vec4f(
-          (sin(uniforms.time) + 1.0) / 2.0,
-          (cos(uniforms.time) + 1.0) / 2.0,
-          (sin(uniforms.time + 3.14) + 1.0) / 2.0,
-          1.0
-        );
-        return texColor * animatedTint;
-      }
-    `;
+    struct Uniforms {
+      tintColor: vec4f,
+      time: f32,
+      padding: vec3f,
+    }
+
+    @group(0) @binding(0) var texSampler: sampler;
+    @group(0) @binding(1) var tex: texture_2d<f32>;
+    @group(0) @binding(2) var<uniform> uniforms: Uniforms;
+
+    struct VertexOutput {
+      @builtin(position) position: vec4f,
+      @location(0) uv: vec2f,
+    }
+
+    @vertex
+    fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
+      var pos = array<vec2f, 4>(
+        vec2f(-1.0, -1.0),
+        vec2f(1.0, -1.0),
+        vec2f(-1.0, 1.0),
+        vec2f(1.0, 1.0)
+      );
+      var uv = array<vec2f, 4>(
+        vec2f(0.0, 1.0),
+        vec2f(1.0, 1.0),
+        vec2f(0.0, 0.0),
+        vec2f(1.0, 0.0)
+      );
+      var output: VertexOutput;
+      output.position = vec4f(pos[vertexIndex], 0.0, 1.0);
+      output.uv = uv[vertexIndex];
+      return output;
+    }
+    
+    fn palette(t: f32) -> vec3<f32> {
+        let a = vec3<f32>(0.8, 0.8, 0.9);
+        let b = vec3<f32>(0.2, 0.1, 0.1);
+        let c = vec3<f32>(1.0, 1.0, 1.0);
+        let d = vec3<f32>(0.0 + 0.18 * cos(0.1 * uniforms.time), 0.33 + 0.18 * sin(0.2 * uniforms.time), 0.67);
+        return a + b * cos(6.28318530718 * (c * t + d));
+    }
+
+    fn luminance(color: vec3<f32>) -> f32 {
+      return dot(color, vec3<f32>(0.299, 0.587, 0.114));
+    }
+
+
+    @fragment
+    fn fragmentMain(@location(0) uv: vec2f) -> @location(0) vec4f {
+      let texColor = textureSample(tex, texSampler, uv);
+      let luminance = 1.-luminance(texColor.rgb);
+      let len = length(uv);
+      let tint = vec4f(
+        palette(uniforms.time * .5 + luminance).r,
+        palette(uniforms.time * .5 + uv.y ).g,
+        palette(uniforms.time * .5 + uv.x ).b,
+        1.0
+      ) * 2.;
+      return clamp(texColor * tint, vec4f(0.0), vec4f(1.0));
+    }
+  `;
 }
 
 customElements.define("webgpu-image", WebGPUImage);
