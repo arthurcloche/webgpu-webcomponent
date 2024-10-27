@@ -3,6 +3,33 @@
     padding: 0;
     box-sizing: border-box;
 }
+
+h1 {
+    color: #2c3e50;
+}
+.image-container {
+    width: 100%;
+    height: 100%;
+    margin: 20px 0;
+}
+.image-container.float-right {
+    float: right;
+    margin-left: 20px;
+    margin-bottom: 20px;
+    width: 200px;
+}
+.image-container.float-left {
+    float: left;
+    margin-right: 20px;
+    margin-bottom: 20px;
+    width: 150px;
+}
+webgpu-image {
+    max-width: 100%;
+    height: auto;
+}
+
+
 body{
     background-color: #111;
     color: #fff;
@@ -34,3 +61,10 @@ webgpu-image {
     display: block;
     margin: 20px auto;
 }
+
+
+    canvas {
+        width: 100vw;
+        height: 100vh;
+        display: block;
+    }
