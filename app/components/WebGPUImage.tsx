@@ -58,7 +58,7 @@ const SHADER_CODE = `
   @fragment
   fn fragmentMain(@location(0) uv: vec2f) -> @location(0) vec4f {
     let offsetUV = offset(uv);
-    let texColor = textureSample(tex, texSampler, offsetUV);
+    let texColor = textureSample(tex, texSampler, uv);
     let luminance = 1.-luminance(texColor.rgb);
     let len = length(uv);
     let tint = vec4f(
@@ -74,9 +74,10 @@ const SHADER_CODE = `
 interface WebGPUImageProps {
   src: string;
   className?: string;
+  onLoad?: () => void;
 }
 
-export default function WebGPUImage({ src, className }: WebGPUImageProps) {
+function WebGPURenderer({ src, className, onLoad }: WebGPUImageProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [gpuContext, setGpuContext] = useState<{
     device: GPUDevice;
@@ -99,6 +100,7 @@ export default function WebGPUImage({ src, className }: WebGPUImageProps) {
       img.crossOrigin = "anonymous";
       img.onload = () => {
         setDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+        onLoad?.();
         resolve(img);
       };
       img.onerror = reject;
@@ -337,6 +339,27 @@ export default function WebGPUImage({ src, className }: WebGPUImageProps) {
         width={dimensions?.width}
         height={dimensions?.height}
         className={className}
+      />
+    </div>
+  );
+}
+
+export default function WebGPUImage({
+  src,
+  className,
+}: {
+  src: string;
+  className?: string;
+}) {
+  const [isLoading, setIsLoading] = useState(true);
+
+  return (
+    <div>
+      {isLoading && <div className="w-full h-full bg-gray-200 animate-pulse" />}
+      <WebGPURenderer
+        src={src}
+        className={className}
+        onLoad={() => setIsLoading(false)}
       />
     </div>
   );
