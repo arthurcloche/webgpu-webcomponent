@@ -11,8 +11,8 @@ const aspectRatios = [
   { width: 500, height: 800 }, // 5:8
   { width: 800, height: 500 }, // 8:5
 ];
-
-const images = Array.from({ length: 72 }, (_, i) => {
+const numImages = 1;
+const images = Array.from({ length: numImages }, (_, i) => {
   const ratio = aspectRatios[i % aspectRatios.length];
   const offset = 100;
   const applyOffsetToWidth = Math.random() < 0.5 ? 0 : offset;
@@ -39,7 +39,7 @@ export default function Index() {
       <Suspense
         fallback={
           <div className="grid grid-cols-3 gap-4 mt-4">
-            {Array.from({ length: 21 }).map((_, i) => (
+            {Array.from({ length: numImages }).map((_, i) => (
               <div
                 key={i}
                 className="aspect-square bg-gray-200 animate-pulse"

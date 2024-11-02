@@ -3,8 +3,10 @@ import { useRef, useEffect, useState } from "react";
 const SHADER_CODE = `
   struct Uniforms {
     tintColor: vec4f,
+    mousePos: vec2f,
+    resolution: vec2f,
+    isHovered: f32,
     time: f32,
-    padding: vec3f,
   }
 
   @group(0) @binding(0) var texSampler: sampler;
@@ -35,39 +37,24 @@ const SHADER_CODE = `
     output.uv = uv[vertexIndex];
     return output;
   }
-  
-  fn palette(t: f32) -> vec3<f32> {
-      let a = vec3<f32>(0.8, 0.8, 0.9);
-      let b = vec3<f32>(0.2, 0.1, 0.1);
-      let c = vec3<f32>(1.0, 1.0, 1.0);
-      let d = vec3<f32>(0.0 + 0.18 * cos(0.1 * uniforms.time), 0.33 + 0.18 * sin(0.2 * uniforms.time), 0.67);
-      return a + b * cos(6.28318530718 * (c * t + d));
-  }
-
-  fn luminance(color: vec3<f32>) -> f32 {
-    return dot(color, vec3<f32>(0.299, 0.587, 0.114));
-  }
 
   fn offset(uv: vec2f) -> vec2f {
     let amplitude = 0.025;
     let frequency = 10.0;
     let phase = uniforms.time * 10.0;
-    return (uv + vec2f(amplitude * sin(frequency * uv.x + phase) * 0., amplitude * sin(frequency * uv.x + phase)));
+    let mouseDistance = distance(uv, uniforms.mousePos);
+    let waveStrength = uniforms.isHovered * smoothstep(0.0, 0.5, mouseDistance);
+    return (uv + vec2f(
+      amplitude * sin(frequency * uv.x + phase) * waveStrength,
+      amplitude * sin(frequency * uv.x + phase) * waveStrength
+    ));
   }
 
   @fragment
   fn fragmentMain(@location(0) uv: vec2f) -> @location(0) vec4f {
     let offsetUV = offset(uv);
-    let texColor = textureSample(tex, texSampler, uv);
-    let luminance = 1.-luminance(texColor.rgb);
-    let len = length(uv);
-    let tint = vec4f(
-      palette(uniforms.time * .5 + luminance).r,
-      palette(uniforms.time * .5 + uv.y ).g,
-      palette(uniforms.time * .5 + uv.x ).b,
-      1.0
-    ) * 2.;
-    return clamp(texColor * tint, vec4f(0.0), vec4f(1.0));
+    let texColor = textureSample(tex, texSampler, offsetUV);
+    return texColor * uniforms.tintColor;
   }
 `;
 
@@ -93,6 +80,8 @@ function WebGPURenderer({ src, className, onLoad }: WebGPUImageProps) {
     width: number;
     height: number;
   } | null>(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const [mousePos, setMousePos] = useState<[number, number]>([0, 0]);
 
   const loadImage = async (src: string): Promise<HTMLImageElement> => {
     return new Promise((resolve, reject) => {
@@ -150,6 +139,7 @@ function WebGPURenderer({ src, className, onLoad }: WebGPUImageProps) {
     uniformBuffer: GPUBuffer
   ) => {
     const bindGroupLayout = device.createBindGroupLayout({
+      label: "bindGroup0",
       entries: [
         {
           binding: 0,
@@ -163,12 +153,12 @@ function WebGPURenderer({ src, className, onLoad }: WebGPUImageProps) {
         },
         {
           binding: 2,
-          visibility: GPUShaderStage.FRAGMENT,
+          visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
           buffer: { type: "uniform" },
         },
       ],
     });
-
+    console.log(bindGroupLayout);
     const bindGroup = device.createBindGroup({
       layout: bindGroupLayout,
       entries: [
@@ -236,7 +226,7 @@ function WebGPURenderer({ src, className, onLoad }: WebGPUImageProps) {
 
         const { texture, sampler } = createTextureAndSampler(device, img);
         const uniformBuffer = device.createBuffer({
-          size: 48,
+          size: 64,
           usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
 
@@ -283,14 +273,34 @@ function WebGPURenderer({ src, className, onLoad }: WebGPUImageProps) {
       const { device, context, pipeline, bindGroup, uniformBuffer } =
         gpuContext;
 
-      const uniformData = new Float32Array(12);
-      uniformData.set([
+      const time = (performance.now() - startTimeRef.current) / 1000;
+
+      const uniformData = new Float32Array([
         1,
         1,
         1,
-        1,
-        (performance.now() - startTimeRef.current) / 1000,
+        1, // tintColor (vec4f)
+        mousePos[0],
+        mousePos[1], // mousePos (vec2f)
+        canvas.current?.width || 0, // resolution (vec2f)
+        canvas.current?.height || 0,
+        isHovered ? 1 : 0,
+        time, // isHovered (f32)
+        0,
+        0,
+        0, // padding to align to 16 bytes
       ]);
+
+      // Debug log every few frames
+      //   if (Math.floor(time) % 2 === 0) {
+      //     console.log("Uniform data:", {
+      //       time,
+      //       mousePos,
+      //       isHovered,
+      //       uniformData: Array.from(uniformData),
+      //     });
+      //   }
+
       device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
       const commandEncoder = device.createCommandEncoder();
@@ -321,7 +331,19 @@ function WebGPURenderer({ src, className, onLoad }: WebGPUImageProps) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [gpuContext]);
+  }, [gpuContext, mousePos, isHovered]);
+
+  const saturate = (value: number) => {
+    return Math.min(Math.max(value, 0), 1);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!canvas.current) return;
+    const rect = canvas.current.getBoundingClientRect();
+    const x = saturate((e.clientX - rect.left) / rect.width);
+    const y = saturate((e.clientY - rect.top) / rect.height);
+    setMousePos([x, y]);
+  };
 
   if (!src) {
     return <div>No source provided</div>;
@@ -339,6 +361,9 @@ function WebGPURenderer({ src, className, onLoad }: WebGPUImageProps) {
         width={dimensions?.width}
         height={dimensions?.height}
         className={className}
+        onMouseMove={handleMouseMove}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       />
     </div>
   );
