@@ -1,17 +1,40 @@
-# Learning WebGPU
+# Welcome to Remix!
 
-## WebGPU Image
+- 📖 [Remix docs](https://remix.run/docs)
 
-## Key learnings
+## Development
 
-- WebGPU is stateless: All state changes must be explicitly defined in command encoders. We set up pipelines, bind groups, and vertex buffers for each render pass.
+Run the dev server:
 
-- WebGPU is asynchronous: Operations like device creation and texture loading are asynchronous. Our main() function is async, and we use promises for image loading.
+```shellscript
+npm run dev
+```
 
-- WebGPU is a low-level API: It provides fine-grained control over GPU operations. Our shaders demonstrate this, allowing precise manipulation of vertices and fragments.
+## Deployment
 
-- WebGPU is a parallel API: It's designed for parallel processing on GPUs. Our shaders process multiple pixels simultaneously, and we use concepts like bind groups to efficiently manage data across parallel executions.
+First, build your app for production:
 
-- WebGPU uses a compile-ahead model: Pipelines and bind group layouts are created upfront, improving runtime performance. This is seen in our createPipeline() and createBindGroup() methods.
+```sh
+npm run build
+```
 
-- WebGPU provides explicit memory management: We create and manage buffers and textures directly, as seen in our texture creation and uniform buffer updates.
+Then run the app in production mode:
+
+```sh
+npm start
+```
+
+Now you'll need to pick a host to deploy it to.
+
+### DIY
+
+If you're familiar with deploying Node applications, the built-in Remix app server is production-ready.
+
+Make sure to deploy the output of `npm run build`
+
+- `build/server`
+- `build/client`
+
+## Styling
+
+This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever css framework you prefer. See the [Vite docs on css](https://vitejs.dev/guide/features.html#css) for more information.
