@@ -73,9 +73,10 @@ const SHADER_CODE = `
 
 interface WebGPUImageProps {
   src: string;
+  className?: string;
 }
 
-export default function WebGPUImage({ src }: WebGPUImageProps) {
+export default function WebGPUImage({ src, className }: WebGPUImageProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [gpuContext, setGpuContext] = useState<{
     device: GPUDevice;
@@ -87,12 +88,19 @@ export default function WebGPUImage({ src }: WebGPUImageProps) {
   const startTimeRef = useRef<number>(0);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const animationFrameRef = useRef<number>();
+  const [dimensions, setDimensions] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
 
   const loadImage = async (src: string): Promise<HTMLImageElement> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.crossOrigin = "anonymous";
-      img.onload = () => resolve(img);
+      img.onload = () => {
+        setDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+        resolve(img);
+      };
       img.onerror = reject;
       img.src = src;
     });
@@ -126,10 +134,8 @@ export default function WebGPUImage({ src }: WebGPUImageProps) {
     const sampler = device.createSampler({
       magFilter: "linear",
       minFilter: "linear",
-      mipmapFilter: "linear",
       addressModeU: "clamp-to-edge",
       addressModeV: "clamp-to-edge",
-      addressModeW: "clamp-to-edge",
     });
 
     return { texture, sampler };
@@ -257,7 +263,7 @@ export default function WebGPUImage({ src }: WebGPUImageProps) {
         console.error("Failed to initialize WebGPU:", error);
       }
     };
-
+    // entry point
     initWebGPU();
 
     return () => {
@@ -320,13 +326,18 @@ export default function WebGPUImage({ src }: WebGPUImageProps) {
   }
 
   return (
-    <canvas
-      ref={canvas}
+    <div
       style={{
-        display: "block",
-        width: "100%",
-        height: "auto",
+        display: "inline-block",
+        lineHeight: 0,
       }}
-    />
+    >
+      <canvas
+        ref={canvas}
+        width={dimensions?.width}
+        height={dimensions?.height}
+        className={className}
+      />
+    </div>
   );
 }
