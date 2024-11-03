@@ -1,6 +1,6 @@
 import type { MetaFunction } from "@remix-run/node";
-import WebGPUImage from "~/components/WebGPUImage";
 import { Suspense } from "react";
+import WebGPUImage from "~/components/WebGPUImage";
 
 const aspectRatios = [
   { width: 400, height: 400 }, // 1:1
@@ -11,12 +11,13 @@ const aspectRatios = [
   { width: 500, height: 800 }, // 5:8
   { width: 800, height: 500 }, // 8:5
 ];
-const numImages = 1;
+const numImages = 240;
 const images = Array.from({ length: numImages }, (_, i) => {
   const ratio = aspectRatios[i % aspectRatios.length];
-  const offset = 100;
-  const applyOffsetToWidth = Math.random() < 0.5 ? 0 : offset;
-  const applyOffsetToHeight = Math.random() < 0.5 ? 0 : offset;
+  const applyOffsetToWidth =
+    Math.random() < 0.5 ? 0 : Math.floor(Math.random() * 100);
+  const applyOffsetToHeight =
+    Math.random() < 0.5 ? 0 : Math.floor(Math.random() * 100);
   return {
     id: i,
     src: `https://picsum.photos/${ratio.width + applyOffsetToWidth}/${
@@ -36,18 +37,7 @@ export default function Index() {
   return (
     <div className="main p-4">
       <h1>Hello World</h1>
-      <Suspense
-        fallback={
-          <div className="grid grid-cols-3 gap-4 mt-4">
-            {Array.from({ length: numImages }).map((_, i) => (
-              <div
-                key={i}
-                className="aspect-square bg-gray-200 animate-pulse"
-              />
-            ))}
-          </div>
-        }
-      >
+      <Suspense fallback={<div>Loading...</div>}>
         <div className="grid grid-cols-3 gap-4 mt-4">
           {images.map((img) => (
             <WebGPUImage key={img.id} src={img.src} className="w-full h-auto" />

@@ -66,6 +66,7 @@ interface WebGPUImageProps {
 
 function WebGPURenderer({ src, className, onLoad }: WebGPUImageProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
   const [gpuContext, setGpuContext] = useState<{
     device: GPUDevice;
     context: GPUCanvasContext;
@@ -82,6 +83,7 @@ function WebGPURenderer({ src, className, onLoad }: WebGPUImageProps) {
   } | null>(null);
   const [isHovered, setIsHovered] = useState(false);
   const [mousePos, setMousePos] = useState<[number, number]>([0, 0]);
+  const [error, setError] = useState<string | null>(null);
 
   const loadImage = async (src: string): Promise<HTMLImageElement> => {
     return new Promise((resolve, reject) => {
@@ -92,15 +94,24 @@ function WebGPURenderer({ src, className, onLoad }: WebGPUImageProps) {
         onLoad?.();
         resolve(img);
       };
-      img.onerror = reject;
+      img.onerror = (e) =>
+        reject(new Error(`Failed to load image: ${src}. ${e}`));
       img.src = src;
     });
   };
 
   const initDevice = async () => {
-    if (!navigator.gpu) throw new Error("WebGPU not supported");
+    if (!navigator.gpu) {
+      throw new Error(
+        "Your browser doesn't support WebGPU. Please try a compatible browser like Chrome Canary."
+      );
+    }
     const adapter = await navigator.gpu.requestAdapter();
-    if (!adapter) throw new Error("No adapter found");
+    if (!adapter) {
+      throw new Error(
+        "No WebGPU adapter found. Your GPU might not be supported."
+      );
+    }
     return await adapter.requestDevice();
   };
 
@@ -158,7 +169,7 @@ function WebGPURenderer({ src, className, onLoad }: WebGPUImageProps) {
         },
       ],
     });
-    console.log(bindGroupLayout);
+
     const bindGroup = device.createBindGroup({
       layout: bindGroupLayout,
       entries: [
@@ -201,9 +212,31 @@ function WebGPURenderer({ src, className, onLoad }: WebGPUImageProps) {
 
   useEffect(() => {
     let isActive = true;
-
+    let observer: IntersectionObserver;
     const initWebGPU = async () => {
       if (!canvas.current || !src) return;
+
+      try {
+        observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              setIsVisible(entry.isIntersecting);
+            });
+          },
+          {
+            root: null,
+            rootMargin: "50px", // distance to start loading before the element is visible
+            threshold: 0.01,
+          }
+        );
+
+        observer.observe(canvas.current);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "An unknown error occurred";
+        console.error("Failed to initialize Intersection Observer:", error);
+        setError(errorMessage);
+      }
 
       try {
         const img = await loadImage(src);
@@ -215,7 +248,11 @@ function WebGPURenderer({ src, className, onLoad }: WebGPUImageProps) {
 
         const device = await initDevice();
         const context = canvas.current.getContext("webgpu");
-        if (!context) throw new Error("Failed to get WebGPU context");
+        if (!context) {
+          throw new Error(
+            "Failed to get WebGPU context. Your browser might not support WebGPU."
+          );
+        }
 
         const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
         context.configure({
@@ -252,13 +289,17 @@ function WebGPURenderer({ src, className, onLoad }: WebGPUImageProps) {
           uniformBuffer,
         });
       } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "An unknown error occurred";
         console.error("Failed to initialize WebGPU:", error);
+        setError(errorMessage);
       }
     };
-    // entry point
+
     initWebGPU();
 
     return () => {
+      observer?.disconnect();
       isActive = false;
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
@@ -267,7 +308,7 @@ function WebGPURenderer({ src, className, onLoad }: WebGPUImageProps) {
   }, [src]);
 
   useEffect(() => {
-    if (!gpuContext) return;
+    if (!gpuContext || !isVisible) return;
 
     const render = () => {
       const { device, context, pipeline, bindGroup, uniformBuffer } =
@@ -276,30 +317,20 @@ function WebGPURenderer({ src, className, onLoad }: WebGPUImageProps) {
       const time = (performance.now() - startTimeRef.current) / 1000;
 
       const uniformData = new Float32Array([
-        1,
-        1,
-        1,
         1, // tintColor (vec4f)
-        mousePos[0],
-        mousePos[1], // mousePos (vec2f)
-        canvas.current?.width || 0, // resolution (vec2f)
+        1,
+        1,
+        1,
+        mousePos[0], // (vec2f)
+        mousePos[1],
+        canvas.current?.width || 0, // (vec2f)
         canvas.current?.height || 0,
-        isHovered ? 1 : 0,
-        time, // isHovered (f32)
-        0,
-        0,
+        isHovered ? 1 : 0, //  (f32)
+        time, //  (f32)
         0, // padding to align to 16 bytes
+        0,
+        0,
       ]);
-
-      // Debug log every few frames
-      //   if (Math.floor(time) % 2 === 0) {
-      //     console.log("Uniform data:", {
-      //       time,
-      //       mousePos,
-      //       isHovered,
-      //       uniformData: Array.from(uniformData),
-      //     });
-      //   }
 
       device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
@@ -331,7 +362,16 @@ function WebGPURenderer({ src, className, onLoad }: WebGPUImageProps) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [gpuContext, mousePos, isHovered]);
+  }, [gpuContext, mousePos, isHovered, isVisible]);
+
+  useEffect(() => {
+    if (!isVisible) {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = undefined;
+      }
+    }
+  }, [isVisible]);
 
   const saturate = (value: number) => {
     return Math.min(Math.max(value, 0), 1);
@@ -344,6 +384,17 @@ function WebGPURenderer({ src, className, onLoad }: WebGPUImageProps) {
     const y = saturate((e.clientY - rect.top) / rect.height);
     setMousePos([x, y]);
   };
+
+  if (error) {
+    return (
+      <div className="relative p-4 border border-red-300 bg-red-50 rounded-md">
+        <p className="text-red-700">Failed to load WebGPU image: {error}</p>
+        <p className="text-sm text-red-500 mt-2">
+          Try refreshing the page or using a WebGPU-compatible browser.
+        </p>
+      </div>
+    );
+  }
 
   if (!src) {
     return <div>No source provided</div>;
@@ -379,8 +430,10 @@ export default function WebGPUImage({
   const [isLoading, setIsLoading] = useState(true);
 
   return (
-    <div>
-      {isLoading && <div className="w-full h-full bg-gray-200 animate-pulse" />}
+    <div className="relative">
+      {isLoading && (
+        <div className="absolute inset-0 bg-gray-200 animate-pulse" />
+      )}
       <WebGPURenderer
         src={src}
         className={className}
